@@ -244,7 +244,6 @@ elif menu == "2. Conferir Consultas/Exames":
         if futuras.empty:
             st.info("Você não tem consultas ou exames futuros marcados.")
         else:
-            # Manhã sempre antecede a Tarde
             futuras["ordem_turno"] = futuras["turno"].apply(lambda t: 1 if str(t).strip().capitalize() == "Manhã" else 2)
             futuras = futuras.sort_values(by=["data_compromisso", "ordem_turno"])
             futuras["dt_obj"] = pd.to_datetime(futuras["data_compromisso"]).dt.date
@@ -264,11 +263,12 @@ elif menu == "2. Conferir Consultas/Exames":
                         
                         caps_tag = "<span class='badge-caps'>CAPS</span>" if eh_caps(tipo_str) else ""
                         
+                        # Mostra o horário SOMENTE se for CAPS e se o campo for válido (não vazio e não 'nan')
                         hora_extra_html = ""
-                        if str(row.get("horario_detalhe", "")).strip():
-                            hora_extra_html = f"<div style='color: #48cae4; font-size: 0.9rem; margin-top: 4px;'>⏰ Horário: <strong>{row['horario_detalhe']}</strong></div>"
+                        horario_val = str(row.get("horario_detalhe", "")).strip()
+                        if eh_caps(tipo_str) and horario_val and horario_val.lower() != "nan":
+                            hora_extra_html = f"<div style='color: #48cae4; font-size: 0.9rem; margin-top: 4px;'>⏰ Horário: <strong>{horario_val}</strong></div>"
                         
-                        # A alteração principal está aqui: tudo na mesma linha, sem espaços no começo
                         conteudo_html += f"<div style='padding: 6px 0;'><strong>{tipo_str}</strong> {caps_tag}<br><span>{rotulo}: {row['nome_detalhe']}</span><br><span class='{badge_class}'>{row['turno']}</span>{hora_extra_html}</div>"
                         
                         if idx < len(itens_lista) - 1:
@@ -401,8 +401,12 @@ elif menu == "6. Histórico de Consultas/Exames":
             rotulo = "Exame" if str(r["tipo_item"]).lower() == "exame" else "Médico"
             caps_tag = " [CAPS]" if eh_caps(r["tipo_item"]) else ""
             
-            hora_extra = f" | Horário: {r['horario_detalhe']}" if str(r.get("horario_detalhe", "")).strip() else ""
+            horario_val = str(r.get("horario_detalhe", "")).strip()
+            hora_extra = ""
+            if eh_caps(r["tipo_item"]) and horario_val and horario_val.lower() != "nan":
+                hora_extra = f" | Horário: {horario_val}"
             
             with st.container(border=True):
                 st.write(f"📅 **{dt_fmt}** ({r['turno']}{hora_extra}) — **{r['tipo_item']}**{caps_tag} | {rotulo}: {r['nome_detalhe']}")
+
         
