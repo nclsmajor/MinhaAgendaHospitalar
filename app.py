@@ -268,18 +268,15 @@ elif menu == "2. Conferir Consultas/Exames":
                         if str(row.get("horario_detalhe", "")).strip():
                             hora_extra_html = f"<div style='color: #48cae4; font-size: 0.9rem; margin-top: 4px;'>⏰ Horário: <strong>{row['horario_detalhe']}</strong></div>"
                         
-                        conteudo_html += f"""
-                        <div style='padding: 6px 0;'>
-                            <strong>{tipo_str}</strong> {caps_tag}<br>
-                            <span>{rotulo}: {row['nome_detalhe']}</span><br>
-                            <span class='{badge_class}'>{row['turno']}</span>
-                            {hora_extra_html}
-                        </div>
-                        """
+                        # A alteração principal está aqui: tudo na mesma linha, sem espaços no começo
+                        conteudo_html += f"<div style='padding: 6px 0;'><strong>{tipo_str}</strong> {caps_tag}<br><span>{rotulo}: {row['nome_detalhe']}</span><br><span class='{badge_class}'>{row['turno']}</span>{hora_extra_html}</div>"
+                        
                         if idx < len(itens_lista) - 1:
                             conteudo_html += "<div class='item-separador'></div>"
+                    
                     conteudo_html += "</div>"
                     st.markdown(conteudo_html, unsafe_allow_html=True)
+
 
 # --- 3. REMARCAR ---
 elif menu == "3. Remarcar Consulta/Exame":
