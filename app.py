@@ -162,7 +162,7 @@ menu = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
-st.markdown("<h1 style='color: #48cae4;'>🏥 Minha Agenda Hospitalar</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #d1c4e9;'>🏥 Minha Agenda Hospitalar</h1>", unsafe_allow_html=True)
 
 df_base = carregar_dados()
 
