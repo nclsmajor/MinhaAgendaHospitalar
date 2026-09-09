@@ -89,7 +89,7 @@ def processar_login(usuario, senha):
         st.error("Usuário ou senha incorretos.")
 
 if not st.session_state["autenticado"]:
-    st.markdown("<h2 style='color: #48cae4; text-align: center; margin-top: 50px;'>🏥 Minha Agenda Hospitalar</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #d1c4e9; text-align: center; margin-top: 50px;'>🏥 Minha Agenda Hospitalar</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #a9b7c6;'>Entre com suas credenciais para acessar a agenda</p>", unsafe_allow_html=True)
     
     _, col_centro, _ = st.columns([1, 1.2, 1])
