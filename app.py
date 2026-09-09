@@ -113,7 +113,7 @@ if not st.session_state["autenticado"]:
     st.stop()
 
 # ==========================================
-# 3. CONEXÃO COM GOOGLE SHEETS
+# 3. CONEXÃO COM GOOGLE SHEETS E AUXILIARES
 # ==========================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -126,7 +126,6 @@ def carregar_dados():
         df = conn.read(ttl="0s")
         if df is None or df.empty:
             return pd.DataFrame(columns=COLUNAS_BASE)
-        # Garante compatibilidade caso a coluna horario_detalhe ainda não exista na planilha
         for col in COLUNAS_BASE:
             if col not in df.columns:
                 df[col] = ""
@@ -146,8 +145,16 @@ MESES_PT = {
 def eh_caps(tipo_item):
     return "(caps)" in str(tipo_item).lower()
 
+def formatar_especialidade(texto):
+    if not texto:
+        return ""
+    texto = str(texto).strip()
+    if "(caps)" in texto.lower():
+        base = texto.lower().replace("(caps)", "").strip().title()
+        return f"{base} (CAPS)"
+    return texto.title()
+
 def obter_horario_transporte(turnos_do_dia):
-    # Se houver qualquer atendimento de Manhã, o carro vai às 02:00h
     turnos_normalizados = [str(t).strip().capitalize() for t in turnos_do_dia]
     if "Manhã" in turnos_normalizados:
         return "02:00h da madrugada"
@@ -195,18 +202,17 @@ if menu == "1. Agendar Consulta/Exame":
     data_sel = st.date_input("Data do compromisso", value=date.today(), format="DD/MM/YYYY")
     
     opcoes_esp = [
-        "clínico geral", "endocrinologista", "psiquiatra", "psicólogo",
-        "psiquiatra (CAPS)", "psicólogo (CAPS)",
-        "ginecologista", "enfermagem", "serviço social", "exame"
+        "Clínico Geral", "Endocrinologista", "Psiquiatra", "Psicólogo",
+        "Psiquiatra (CAPS)", "Psicólogo (CAPS)",
+        "Ginecologista", "Enfermagem", "Serviço Social", "Exame"
     ]
     especialidade_sel = st.selectbox("Especialidade ou Tipo", opcoes_esp)
     
-    eh_tipo_exame = especialidade_sel == "exame"
+    eh_tipo_exame = especialidade_sel.lower() == "exame"
     nome_detalhe = st.text_input("Nome do Exame:" if eh_tipo_exame else "Nome do Médico:")
     
     turno_sel = st.radio("Horário / Turno", ["Manhã", "Tarde"], horizontal=True)
     
-    # Campo específico de detalhe do horário para consultas do CAPS
     horario_detalhe = ""
     if eh_caps(especialidade_sel):
         horario_detalhe = st.text_input("Especificação do Horário (CAPS):", placeholder="Ex: 9:30 AM, 14:00, 10:15 AM")
@@ -218,7 +224,7 @@ if menu == "1. Agendar Consulta/Exame":
             novo_id = 1 if df_base.empty else int(pd.to_numeric(df_base["id"], errors="coerce").max() or 0) + 1
             novo_registro = pd.DataFrame([{
                 "id": novo_id,
-                "tipo_item": especialidade_sel,
+                "tipo_item": formatar_especialidade(especialidade_sel),
                 "nome_detalhe": nome_detalhe.strip(),
                 "data_compromisso": data_sel.strftime("%Y-%m-%d"),
                 "turno": turno_sel,
@@ -256,14 +262,13 @@ elif menu == "2. Conferir Consultas/Exames":
                     itens_lista = df_dia.to_dict("records")
                     
                     for idx, row in enumerate(itens_lista):
-                        tipo_str = str(row.get("tipo_item", ""))
+                        tipo_str = formatar_especialidade(row.get("tipo_item", ""))
                         turno_str = str(row.get("turno", "")).strip().capitalize()
                         badge_class = "badge-manha" if turno_str == "Manhã" else "badge-tarde"
                         rotulo = "Exame" if tipo_str.lower() == "exame" else "Médico"
                         
                         caps_tag = "<span class='badge-caps'>CAPS</span>" if eh_caps(tipo_str) else ""
                         
-                        # Mostra o horário SOMENTE se for CAPS e se o campo for válido (não vazio e não 'nan')
                         hora_extra_html = ""
                         horario_val = str(row.get("horario_detalhe", "")).strip()
                         if eh_caps(tipo_str) and horario_val and horario_val.lower() != "nan":
@@ -277,7 +282,6 @@ elif menu == "2. Conferir Consultas/Exames":
                     conteudo_html += "</div>"
                     st.markdown(conteudo_html, unsafe_allow_html=True)
 
-
 # --- 3. REMARCAR ---
 elif menu == "3. Remarcar Consulta/Exame":
     st.subheader("Remarcar Data / Horário")
@@ -288,7 +292,7 @@ elif menu == "3. Remarcar Consulta/Exame":
         st.info("Nenhuma consulta agendada para remarcar.")
     else:
         opcoes = {
-            f"ID {r['id']} - {datetime.strptime(str(r['data_compromisso']), '%Y-%m-%d').strftime('%d/%m/%Y')} | {r['tipo_item']} ({r['nome_detalhe']}) - {r['turno']}": r['id']
+            f"ID {r['id']} - {datetime.strptime(str(r['data_compromisso']), '%Y-%m-%d').strftime('%d/%m/%Y')} | {formatar_especialidade(r['tipo_item'])} ({r['nome_detalhe']}) - {r['turno']}": r['id']
             for _, r in futuras.iterrows()
         }
         item_sel = st.selectbox("Selecione qual deseja remarcar:", list(opcoes.keys()))
@@ -301,6 +305,8 @@ elif menu == "3. Remarcar Consulta/Exame":
         
         novo_horario_detalhe = str(linha.get("horario_detalhe", ""))
         if eh_caps(linha["tipo_item"]):
+            if novo_horario_detalhe.lower() == "nan":
+                novo_horario_detalhe = ""
             novo_horario_detalhe = st.text_input("Especificação do Horário (CAPS):", value=novo_horario_detalhe, placeholder="Ex: 9:30 AM")
 
         if st.button("Confirmar Remarcação", use_container_width=True):
@@ -321,7 +327,7 @@ elif menu == "4. Apagar Consulta/Exame":
         st.info("Não há agendamentos para excluir.")
     else:
         opcoes = {
-            f"ID {r['id']} - {datetime.strptime(str(r['data_compromisso']), '%Y-%m-%d').strftime('%d/%m/%Y')} | {r['tipo_item']} ({r['nome_detalhe']})": r['id']
+            f"ID {r['id']} - {datetime.strptime(str(r['data_compromisso']), '%Y-%m-%d').strftime('%d/%m/%Y')} | {formatar_especialidade(r['tipo_item'])} ({r['nome_detalhe']})": r['id']
             for _, r in futuras.iterrows()
         }
         item_sel = st.selectbox("Selecione para remover:", list(opcoes.keys()))
@@ -339,28 +345,21 @@ elif menu == "5. Passagens":
     st.caption("Passagens organizadas por dia de viagem. Atendimentos do CAPS não necessitam de transporte e são ocultados aqui.")
     
     hoje = date.today().strftime("%Y-%m-%d")
-    
-    # 1. Filtra consultas futuras
     futuras = df_base[(df_base["data_compromisso"] >= hoje) & (df_base["status"] == "agendado")].copy()
-    
-    # 2. Remove consultas do CAPS (não precisam de passagem)
     futuras_transporte = futuras[~futuras["tipo_item"].apply(eh_caps)].copy()
     
     if futuras_transporte.empty:
         st.info("Nenhuma viagem pendente no momento (não há consultas fora do CAPS que necessitem de carro).")
     else:
-        # Agrupa compromissos por dia para haver somente uma passagem diária
         dias_unicos = sorted(futuras_transporte["data_compromisso"].unique())
         
         for data_viagem in dias_unicos:
             consultas_do_dia = futuras_transporte[futuras_transporte["data_compromisso"] == data_viagem]
             dt_fmt = datetime.strptime(str(data_viagem), "%Y-%m-%d").strftime("%d/%m/%Y")
             
-            # Horário único do carro no dia baseado nos turnos do dia
             turnos_dia = list(consultas_do_dia["turno"])
             horario_carro = obter_horario_transporte(turnos_dia)
             
-            # Passagem marcada: se pelo menos uma constar como 1
             passagem_marcada = any(pd.to_numeric(consultas_do_dia["passagem_marcada"], errors="coerce").fillna(0) == 1)
             ids_do_dia = list(consultas_do_dia["id"])
             
@@ -369,9 +368,9 @@ elif menu == "5. Passagens":
             resumo_texto = f"{status_icone} | {dt_fmt} ({qtd_compromissos} {'compromisso' if qtd_compromissos == 1 else 'compromissos'})"
             
             with st.expander(resumo_texto):
-                st.markdown(f"**Consultas/Exames deste dia que utilizam transporte:**")
+                st.markdown("**Consultas/Exames deste dia que utilizam transporte:**")
                 for _, item in consultas_do_dia.iterrows():
-                    st.write(f"- **{item['tipo_item']}** com *{item['nome_detalhe']}* (Turno: **{item['turno']}**)")
+                    st.write(f"- **{formatar_especialidade(item['tipo_item'])}** com *{item['nome_detalhe']}* (Turno: **{item['turno']}**)")
                 
                 st.markdown("---")
                 if passagem_marcada:
@@ -407,6 +406,4 @@ elif menu == "6. Histórico de Consultas/Exames":
                 hora_extra = f" | Horário: {horario_val}"
             
             with st.container(border=True):
-                st.write(f"📅 **{dt_fmt}** ({r['turno']}{hora_extra}) — **{r['tipo_item']}**{caps_tag} | {rotulo}: {r['nome_detalhe']}")
-
-        
+                st.write(f"📅 **{dt_fmt}** ({r['turno']}{hora_extra}) — **{formatar_especialidade(r['tipo_item'])}**{caps_tag} | {rotulo}: {r['nome_detalhe']}")
